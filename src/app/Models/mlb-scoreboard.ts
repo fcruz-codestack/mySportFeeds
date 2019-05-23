@@ -84,3 +84,9 @@ export class MlbScoreboard {
     ];
   };
 }
+
+export class IGameInnings {
+  number: number;
+  awayScore: number;
+  homeScore: number;
+}

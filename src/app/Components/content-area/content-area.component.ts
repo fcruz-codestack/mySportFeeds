@@ -1,11 +1,10 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { DataServiceService } from 'src/app/Services/data-service.service';
-import { IScoreboard } from 'src/app/Models/IScoreboard';
+import { IScoreboard, IGameSummary } from 'src/app/Models/IScoreboard';
 import { MlbIconService } from 'src/app/Services/mlb-icon.service';
 import { DatePickerService } from 'src/app/Services/date-picker.service';
 import { Subscription } from 'rxjs';
-import { parseIntAutoRadix } from '@angular/common/src/i18n/format_number';
-import { MlbScoreboard } from 'src/app/Models/mlb-scoreboard';
+import { MlbScoreboard, IGameInnings } from 'src/app/Models/mlb-scoreboard';
 import { MlbDailySched } from 'src/app/Models/mlb-daily-sched';
 
 @Component({
@@ -15,8 +14,10 @@ import { MlbDailySched } from 'src/app/Models/mlb-daily-sched';
 })
 export class ContentAreaComponent implements OnInit, OnDestroy {
   gamesArray: IScoreboard[] = [];
+  gameInnings: IGameInnings[] = [];
   scoreBoardArray: MlbScoreboard;
   dailySchedArray: MlbDailySched;
+  private baseUrl = 'https://api.mysportsfeeds.com/v1.1/pull/mlb/2019-regular/';
   private scoreboardUrl = 'scoreboard.json?fordate=';
   private dailyGameScheduleUrl = 'daily_game_schedule.json?fordate=';
   homeSrc: string;
@@ -43,7 +44,7 @@ export class ContentAreaComponent implements OnInit, OnDestroy {
       );
       this.gamesArray = [];
       this.compareDates();
-      this.httpRequest();
+      this.loadData();
     });
     this.contentSubscriptions.add(dateSubscription);
     this.compareDates();
@@ -53,62 +54,114 @@ export class ContentAreaComponent implements OnInit, OnDestroy {
     this.contentSubscriptions.unsubscribe();
   }
 
-  httpRequest() {
+  loadData() {
     let url = '';
     switch (this.feedUrl) {
       case 'daily_game_schedule':
-        url = this.dailyGameScheduleUrl + this.selectedDate;
-        const dailySchedSubscription = this.dataService.getDailyGameSchedule(url).subscribe(x => {
-          console.log('ngOnInit() SAYS: this is x -> ', x);
-          this.dailySchedArray = x;
-          console.log('ngOnInit() SAYS: DAILY SCHED -> ', this.dailySchedArray);
-        });
+        url = this.baseUrl + this.dailyGameScheduleUrl + this.selectedDate;
+        const dailySchedSubscription = this.dataService.getFeed(url)
+          .subscribe(x => {
+            // console.log('ngOnInit() SAYS: this is x -> ', x);
+            // this.dailySchedArray = x;
+            // console.log('ngOnInit() SAYS: DAILY SCHED -> ', this.dailySchedArray);
+            for (const schedule of x.dailygameschedule.gameentry) {
+              this.homeSrc = this.mlbIconService.getLogo(schedule.homeTeam.Abbreviation);
+              this.awaySrc = this.mlbIconService.getLogo(schedule.awayTeam.Abbreviation);
+              const nfo: IScoreboard = {
+                id: schedule.id,
+                date: schedule.date,
+                time: schedule.time,
+                lastUpdatedOn: x.dailygameschedule.lastUpdatedOn,
+                scheduleStatus: schedule.scheduleStatus,
+                delayedOrPostponedReason: schedule.delayedOrPostponedReason,
+                originalDate: schedule.originalDate,
+                originalTime: schedule.originalTime,
+                homeTeamId: schedule.homeTeam.ID,
+                homeTeamName: schedule.homeTeam.Name,
+                homeTeamCity: schedule.homeTeam.City,
+                homeTeamIcon: this.homeSrc,
+                homeTeamAbbreviation: schedule.homeTeam.Abbreviation,
+                awayTeamId: schedule.awayTeam.ID,
+                awayTeamName: schedule.awayTeam.Name,
+                awayTeamCity: schedule.homeTeam.City,
+                awayTeamIcon: this.awaySrc,
+                awayTeamAbbreviation: schedule.awayTeam.Abbreviation,
+                location: schedule.location,
+                awayScore: null,
+                homeScore: null,
+                isUnplayed: null,
+                isInProgress: null,
+                isCompleted: null,
+                playStatus: null,
+              };
+              this.gamesArray.push(nfo);
+            }
+          });
         this.contentSubscriptions.add(dailySchedSubscription);
         break;
       case 'scoreboard':
-        url = this.scoreboardUrl + this.selectedDate;
-        const scoreBoardSubscription = this.dataService.getScoreBoard(url).subscribe(x => {
-          console.log('ngOnInit() SAYS: this is x -> ', x);
-          this.scoreBoardArray = x;
-          console.log('ngOnInit() SAYS: SCOREBOARD -> ', this.scoreBoardArray);
-        });
+        url = this.baseUrl + this.scoreboardUrl + this.selectedDate;
+        const scoreBoardSubscription = this.dataService
+          .getFeed(url)
+          .subscribe(x => {
+            // console.log('ngOnInit() SAYS: this is x -> ', x);
+            // this.scoreBoardArray = x;
+            // console.log('ngOnInit() SAYS: SCOREBOARD -> ', this.scoreBoardArray);
+            /* for (const gameSummary of x.scoreboard.inningSummary.inning) {
+              const summary: IGameSummary = {
+                inning: gameSummary.'@number',
+                awayTeam: summary.awayTeam,
+                homeTeam: summary.homeTeam
+              }
+            } */
+            for (let i = 0;  x.scoreboard.inningSummary.length < i; i++) {
+              this.gameInnings[i] = {
+                number: x.scoreboard.inningSummary.inning[i]['@number'],
+                awayScore: x.scoreboard.inningSummary.inning[i].awayScore,
+                homeScore: x.scoreboard.inningSummary.inning[i].homeScore,
+              }
+            };
+            for (const gameScore of x.scoreboard.gameScore) {
+              this.homeSrc = this.mlbIconService.getLogo(gameScore.game.homeTeam.Abbreviation);
+              this.awaySrc = this.mlbIconService.getLogo(gameScore.game.awayTeam.Abbreviation);
+              const nfo: IScoreboard = {
+                id: gameScore.game.ID,
+                date: gameScore.game.date,
+                time: gameScore.game.time,
+                lastUpdatedOn: x.scoreboard.lastUpdatedOn,
+                scheduleStatus: gameScore.game.scheduleStatus,
+                delayedOrPostponedReason: gameScore.game.delayedOrPostponedReason,
+                originalDate: gameScore.game.originalDate,
+                originalTime: gameScore.game.originalTime,
+                homeTeamId: gameScore.game.homeTeam.ID,
+                homeTeamName: gameScore.game.homeTeam.Name,
+                homeTeamCity: gameScore.game.homeTeam.City,
+                homeTeamIcon: this.homeSrc,
+                homeTeamAbbreviation: gameScore.game.homeTeam.Abbreviation,
+                awayTeamId: gameScore.game.awayTeam.ID,
+                awayTeamName: gameScore.game.awayTeam.Name,
+                awayTeamCity: gameScore.game.awayTeam.City,
+                awayTeamIcon: this.awaySrc,
+                awayTeamAbbreviation: gameScore.game.awayTeam.Abbreviation,
+                location: gameScore.game.location,
+                awayScore: gameScore.awayScore,
+                homeScore: gameScore.homeScore,
+                isUnplayed: gameScore.isUnplayed,
+                isInProgress: gameScore.isInProgress,
+                isCompleted: gameScore.isCompleted,
+                playStatus: gameScore.playStatus,
+              };
+              this.gamesArray.push(nfo);
+            }
+          })
         this.contentSubscriptions.add(scoreBoardSubscription);
         break;
       default:
         break;
     }
-    
-
-    /* const dataSubscription = this.dataService
-      .getUrl(url, this.selectedDate)
-      .subscribe(x => {
-        console.log('ngOnInit() SAYS: this x->', x);
-        for (const gameScore of x.scoreboard.gameScore) {
-          this.homeSrc = this.mlbIconService.getLogo(gameScore.game.homeTeam.Abbreviation);
-          this.awaySrc = this.mlbIconService.getLogo(gameScore.game.awayTeam.Abbreviation);
-          const nfo: IScoreboard = {
-            date: gameScore.game.date,
-            time: gameScore.game.time,
-            lastUpdatedOn: x.scoreboard.lastUpdatedOn,
-            scheduleStatus: gameScore.game.scheduleStatus,
-            originalDate: gameScore.game.originalDate,
-            originalTime: gameScore.game.originalDate,
-            homeTeamName: gameScore.game.homeTeam.Name,
-            homeTeamIcon: this.homeSrc,
-            homeTeamAbbreviation: gameScore.game.homeTeam.Abbreviation,
-            awayTeamCity: gameScore.game.awayTeam.City,
-            awayTeamName: gameScore.game.awayTeam.Name,
-            awayTeamIcon: this.awaySrc,
-            awayTeamAbbreviation: gameScore.game.awayTeam.Abbreviation,
-            location: gameScore.game.location,
-            awayScore: gameScore.awayScore,
-            homeScore: gameScore.homeScore
-          };
-          this.gamesArray.push(nfo);
-        }
-      }); */
+    console.log('ngOnInit() SAYS: this is gamesArray -> ', this.gamesArray);
   }
-  compareDates() {
+compareDates(); {
     // tslint:disable-next-line: radix
     const selDay = parseInt(this.selectedDate.substr(6, 2));
     // tslint:disable-next-line: radix
