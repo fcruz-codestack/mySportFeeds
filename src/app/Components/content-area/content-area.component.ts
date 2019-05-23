@@ -119,8 +119,8 @@ export class ContentAreaComponent implements OnInit, OnDestroy {
                 number: x.scoreboard.inningSummary.inning[i]['@number'],
                 awayScore: x.scoreboard.inningSummary.inning[i].awayScore,
                 homeScore: x.scoreboard.inningSummary.inning[i].homeScore,
-              }
-            };
+              };
+            }
             for (const gameScore of x.scoreboard.gameScore) {
               this.homeSrc = this.mlbIconService.getLogo(gameScore.game.homeTeam.Abbreviation);
               this.awaySrc = this.mlbIconService.getLogo(gameScore.game.awayTeam.Abbreviation);
@@ -153,7 +153,7 @@ export class ContentAreaComponent implements OnInit, OnDestroy {
               };
               this.gamesArray.push(nfo);
             }
-          })
+          });
         this.contentSubscriptions.add(scoreBoardSubscription);
         break;
       default:
@@ -161,7 +161,7 @@ export class ContentAreaComponent implements OnInit, OnDestroy {
     }
     console.log('ngOnInit() SAYS: this is gamesArray -> ', this.gamesArray);
   }
-compareDates(); {
+compareDates() {
     // tslint:disable-next-line: radix
     const selDay = parseInt(this.selectedDate.substr(6, 2));
     // tslint:disable-next-line: radix
